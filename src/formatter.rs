@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 
-const TEMPLATE_NAME: &'static str = "addr";
+const MULTILINE_TEMPLATE_NAME: &'static str = "multi_line";
+const SHORT_ADDR_TEMPLATE_NAME: &'static str = "short_addr";
 
 /// Represents a Regex and the value to replace the regex matches with
 #[derive(Debug, Clone)]
@@ -69,16 +70,33 @@ pub(crate) struct NewComponent {
 #[derive(Debug, Default)]
 pub(crate) struct Template {
     /// Moustache template
-    place_template: String, // used only to clone the template
     pub handlebar_handler: handlebars::Handlebars,
+    place_template: String, // used only to clone the template
+}
+
+// Compute a string with only the formatting rule for a short address
+// (basicaly only the housenumber and the road)
+// it's not very elegant, but it works to only find the line with the housenumber
+fn compute_short_addr_template(place_template: &str) -> Option<String> {
+    place_template
+        .split("\n")
+        .find(|l| l.contains("house_number"))
+        .map(|l| l.trim().to_owned())
 }
 
 impl Template {
     pub fn new(place_template: &str) -> Self {
         let mut template_engine = crate::handlebar_helper::new_template_engine();
         template_engine
-            .register_template_string(TEMPLATE_NAME, place_template)
-            .expect("impossible to build template");
+            .register_template_string(MULTILINE_TEMPLATE_NAME, place_template)
+            .expect("impossible to build multi line template");
+
+        if let Some(short_addr_template) = compute_short_addr_template(place_template) {
+            template_engine
+                .register_template_string(SHORT_ADDR_TEMPLATE_NAME, &short_addr_template)
+                .expect("impossible to build short addr template");
+        }
+
         Template {
             place_template: place_template.to_owned(),
             handlebar_handler: template_engine,
@@ -235,11 +253,65 @@ impl Formatter {
 
         let text = template
             .handlebar_handler
-            .render(TEMPLATE_NAME, &addr)
+            .render(MULTILINE_TEMPLATE_NAME, &addr)
             .map_err(|e| e.context("impossible to render template"))?;
 
         let text = cleanup_rendered(&text, &rules);
 
+        Ok(text)
+    }
+
+    /// make a human readable short text on 1 line with only the address [`Place`](struct.Place.html)
+    /// There is basically only the housenumber and the road
+    /// ```
+    /// # #[macro_use] extern crate maplit;
+    /// # fn main() {
+    ///    use address_formatter::Component::*;
+    ///    let formatter = address_formatter::Formatter::default();
+    ///
+    ///    let addr: address_formatter::Place = hashmap!(
+    ///        City => "Toulouse",
+    ///        Country => "France",
+    ///        CountryCode => "FR",
+    ///        County => "Toulouse",
+    ///        HouseNumber => "17",
+    ///        Neighbourhood => "Lafourguette",
+    ///        Postcode => "31000",
+    ///        Road => "Rue du Médecin-Colonel Calbairac",
+    ///        State => "Midi-Pyrénées",
+    ///        Suburb => "Toulouse Ouest",
+    ///    ).into();
+    ///
+    ///    assert_eq!(
+    ///        formatter.short_addr_format(addr).unwrap(),
+    ///        r#"17 Rue du Médecin-Colonel Calbairac"#
+    ///        .to_owned()
+    ///    )
+    /// # }
+    /// ```
+    pub fn short_addr_format(&self, into_addr: impl Into<Place>) -> Result<String, Error> {
+        self.short_addr_format_with_config(into_addr.into(), Configuration::default())
+    }
+
+    /// make a human readable short text on 1 line with only the address [`Place`](struct.Place.html)
+    /// Same as the [`short_addr_format`](struct.Formatter.html#method.short_addr_format) method,
+    /// but with a [`Configuration`](address_formatter::formatter::Configuration) object
+    pub fn short_addr_format_with_config(
+        &self,
+        into_addr: impl Into<Place>,
+        conf: Configuration,
+    ) -> Result<String, Error> {
+        let mut addr = into_addr.into();
+        let country_code = self.find_country_code(&mut addr, conf);
+
+        let template = self.find_template(&addr, &country_code);
+
+        let text = template
+            .handlebar_handler
+            .render(SHORT_ADDR_TEMPLATE_NAME, &addr)
+            .map_err(|e| e.context("impossible to render short address template"))?;
+
+        let text = text.trim().to_owned();
         Ok(text)
     }
 
