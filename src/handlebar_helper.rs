@@ -8,13 +8,13 @@ use handlebars::{
 pub struct FirstNonNullHelper;
 
 impl HelperDef for FirstNonNullHelper {
-    fn call<'reg: 'rc, 'rc>(
+    fn call<'reg: 'rc, 'rc, 'a>(
         &self,
         h: &Helper<'reg, 'rc>,
         r: &'reg Handlebars,
-        ctx: &Context,
-        rc: &mut RenderContext<'reg>,
-        out: &mut Output,
+        ctx: &'a Context,
+        rc: &mut RenderContext<'reg, 'a>,
+        out: &mut dyn Output,
     ) -> HelperResult {
         let tpl = h
             .template()
@@ -26,14 +26,14 @@ impl HelperDef for FirstNonNullHelper {
             .split("||")
             .map(|s| s.trim())
             .find(|v| !v.is_empty())
-            .unwrap_or_else(|| "");
+            .unwrap_or("");
 
-        out.write(&value)?;
+        out.write(value)?;
         Ok(())
     }
 }
 
-pub fn new_template_engine() -> handlebars::Handlebars {
+pub fn new_template_engine() -> handlebars::Handlebars<'static> {
     let mut template_engine = handlebars::Handlebars::new();
 
     // we add our custom helper, 'first'

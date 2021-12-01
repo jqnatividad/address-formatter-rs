@@ -1,14 +1,13 @@
 use crate::{Component, Place};
-use failure::Fail;
-use failure::{format_err, Error};
+use anyhow::{anyhow, Context, Error};
 use itertools::Itertools;
 use regex::{Regex, RegexBuilder};
 use std::collections::HashMap;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 
-const MULTILINE_TEMPLATE_NAME: &'static str = "multi_line";
-const SHORT_ADDR_TEMPLATE_NAME: &'static str = "short_addr";
+const MULTILINE_TEMPLATE_NAME: &str = "multi_line";
+const SHORT_ADDR_TEMPLATE_NAME: &str = "short_addr";
 
 /// Represents a Regex and the value to replace the regex matches with
 #[derive(Debug, Clone)]
@@ -39,7 +38,7 @@ impl FromStr for CountryCode {
                 Ok(CountryCode(s.to_uppercase()))
             }
         } else {
-            Err(format_err!(
+            Err(anyhow!(
                 "{} is not a valid ISO3166-1:alpha2 country code",
                 s,
             ))
@@ -70,7 +69,7 @@ pub(crate) struct NewComponent {
 #[derive(Debug, Default)]
 pub(crate) struct Template {
     /// Moustache template
-    pub handlebar_handler: handlebars::Handlebars,
+    pub handlebar_handler: handlebars::Handlebars<'static>,
     place_template: String, // used only to clone the template
 }
 
@@ -79,7 +78,7 @@ pub(crate) struct Template {
 // it's not very elegant, but it works to only find the line with the housenumber
 fn compute_short_addr_template(place_template: &str) -> Option<String> {
     place_template
-        .split("\n")
+        .split('\n')
         .find(|l| l.contains("house_number"))
         .map(|l| l.trim().to_owned())
 }
@@ -247,16 +246,16 @@ impl Formatter {
         let rules = country_code
             .as_ref()
             .and_then(|c| self.templates.rules_by_country.get(c))
-            .unwrap_or_else(|| &self.templates.fallback_rules);
+            .unwrap_or(&self.templates.fallback_rules);
 
-        self.preformat(&rules, &mut addr);
+        self.preformat(rules, &mut addr);
 
         let text = template
             .handlebar_handler
             .render(MULTILINE_TEMPLATE_NAME, &addr)
-            .map_err(|e| e.context("impossible to render template"))?;
+            .context("impossible to render template")?;
 
-        let text = cleanup_rendered(&text, &rules);
+        let text = cleanup_rendered(&text, rules);
 
         Ok(text)
     }
@@ -309,7 +308,7 @@ impl Formatter {
         let text = template
             .handlebar_handler
             .render(SHORT_ADDR_TEMPLATE_NAME, &addr)
-            .map_err(|e| e.context("impossible to render short address template"))?;
+            .context("impossible to render short address template")?;
 
         let text = text.trim().to_owned();
         Ok(text)
@@ -347,11 +346,7 @@ impl Formatter {
         country_code
     }
 
-    fn find_template<'a>(
-        &'a self,
-        addr: &Place,
-        country_code: &Option<CountryCode>,
-    ) -> &'a Template {
+    fn find_template(&self, addr: &Place, country_code: &Option<CountryCode>) -> &Template {
         country_code
             .as_ref()
             .and_then(|c| {
@@ -360,10 +355,10 @@ impl Formatter {
                     // if there is a specific one, else we get the default fallback template
                     self.templates
                         .fallback_templates_by_country
-                        .get(&c)
-                        .or_else(|| Some(&self.templates.fallback_template))
+                        .get(c)
+                        .or(Some(&self.templates.fallback_template))
                 } else {
-                    self.templates.templates_by_country.get(&c)
+                    self.templates.templates_by_country.get(c)
                 }
             })
             .unwrap_or(&self.templates.default_template)
@@ -438,7 +433,7 @@ impl PlaceBuilder {
         let mut place = Place::default();
         let mut unknown = HashMap::<String, String>::new();
         for (k, v) in values.into_iter() {
-            let component = Component::from_str(k).ok();;
+            let component = Component::from_str(k).ok();
             if let Some(component) = component {
                 place[component] = Some(v);
             } else {
@@ -504,7 +499,6 @@ fn sanity_clean_place(addr: &mut Place) {
 }
 
 fn cleanup_rendered(text: &str, rules: &Rules) -> String {
-    use itertools::Itertools;
     lazy_static::lazy_static! {
         static ref REPLACEMENTS:  [(Regex, &'static str); 12]= [
             (RegexBuilder::new(r"[},\s]+$").multi_line(true).build().unwrap(), ""),
@@ -588,7 +582,7 @@ impl ReplaceRule {
                         addr[c] = Some(
                             replace_rule
                                 .regex
-                                .replace(&v, replace_rule.replacement_value.as_str())
+                                .replace(v, replace_rule.replacement_value.as_str())
                                 .to_string(),
                         );
                     }
@@ -599,7 +593,7 @@ impl ReplaceRule {
                     addr[*c] = Some(
                         replace_rule
                             .regex
-                            .replace(&v, replace_rule.replacement_value.as_str())
+                            .replace(v, replace_rule.replacement_value.as_str())
                             .to_string(),
                     );
                 }

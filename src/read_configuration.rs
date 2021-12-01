@@ -3,20 +3,27 @@ use crate::formatter::{
     Templates,
 };
 use crate::Component;
-use failure::{format_err, Error};
+use anyhow::{anyhow, Error};
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::str::FromStr;
+
+lazy_static! {
+    static ref RAW_TEMPLATES: Vec<yaml_rust::Yaml> = {
+        let raw_yaml = include_str!("../address-formatting/conf/countries/worldwide.yaml");
+
+        yaml_rust::YamlLoader::load_from_str(raw_yaml)
+            .expect("impossible to read worldwide.yaml file")
+    };
+}
 
 pub fn read_configuration() -> Formatter {
     // read all the opencage configuration
     // let opencage_dir = include_dir!("./address-formatting/conf");
-    let templates_file = include_str!("../address-formatting/conf/countries/worldwide.yaml");
-
-    let raw_templates = yaml_rust::YamlLoader::load_from_str(templates_file)
-        .expect("impossible to read worldwide.yaml file");
-    let default_template = build_template(&raw_templates[0]["default"]["address_template"])
+    let default_template = build_template(&RAW_TEMPLATES[0]["default"]["address_template"])
         .expect("no default address_template provided");
-    let fallback_template = build_template(&raw_templates[0]["default"]["fallback_template"])
+
+    let fallback_template = build_template(&RAW_TEMPLATES[0]["default"]["fallback_template"])
         .expect("no fallback address_template provided");
 
     // some countries uses the same rules as other countries (with some slight changes)
@@ -26,7 +33,7 @@ pub fn read_configuration() -> Formatter {
 
     let mut fallback_templates_by_country = HashMap::new();
     let mut rules_by_country = HashMap::new();
-    let mut templates_by_country: HashMap<CountryCode, Template> = raw_templates[0]
+    let mut templates_by_country: HashMap<CountryCode, Template> = RAW_TEMPLATES[0]
         .as_hash()
         .unwrap()
         .iter()
@@ -56,10 +63,12 @@ pub fn read_configuration() -> Formatter {
                     })
                     .collect();
 
-                let template = build_template(&v["address_template"]).expect(&format!(
-                    "no address_template found for country {}",
-                    country_code
-                ));
+                let template = build_template(&v["address_template"]).unwrap_or_else(|err| {
+                    panic!(
+                        "no address_template found for country {}: {}",
+                        country_code, err
+                    )
+                });
                 let rules = Rules {
                     replace: replace_rules,
                     postformat_replace: post_format_replace_rules,
@@ -94,8 +103,8 @@ pub fn read_configuration() -> Formatter {
 
         let mut new_rules = rules_by_country
             .get(&parent_country_code)
-            .map(|r| r.clone())
-            .unwrap_or_else(|| Rules::default());
+            .cloned()
+            .unwrap_or_default();
         new_rules.change_country_code = Some(parent_country_code.as_str().to_owned());
         new_rules.change_country = template["change_country"].as_str().map(|s| s.to_string());
         new_rules.add_component = add_component;
@@ -161,12 +170,12 @@ pub fn read_place_builder_configuration() -> PlaceBuilder {
     for c in &raw_components {
         if let Some(aliases) = c["aliases"].as_vec() {
             let name = c["name"].as_str().unwrap();
-            let component =
-                Component::from_str(name).expect(&format!("{} is not a valid component", name));
+            let component = Component::from_str(name)
+                .unwrap_or_else(|err| panic!("{} is not a valid component: {}", name, err));
             for a in aliases {
                 component_aliases
                     .entry(component)
-                    .or_insert_with(|| vec![])
+                    .or_insert_with(Vec::new)
                     .push(a.as_str().unwrap().to_string());
             }
         }
@@ -178,7 +187,7 @@ pub fn read_place_builder_configuration() -> PlaceBuilder {
 fn build_template(yaml_value: &yaml_rust::Yaml) -> Result<Template, Error> {
     let addr_template = yaml_value
         .as_str()
-        .ok_or_else(|| format_err!("no value to build template"))?;
+        .ok_or_else(|| anyhow!("no value to build template"))?;
 
     Ok(Template::new(addr_template))
 }
@@ -197,10 +206,12 @@ fn read_replace(yaml_rules: &yaml_rust::Yaml) -> Vec<ReplaceRule> {
                         // it's a replace on only one component
                         // the rules is written 'component=<string_to_replace'
                         let parts = first_val.split('=').collect::<Vec<_>>();
-                        let component = Component::from_str(parts[0]).expect(&format!(
-                            "in replace '{}' is not a valid component",
-                            parts[0]
-                        ));
+                        let component = Component::from_str(parts[0]).unwrap_or_else(|err| {
+                            panic!(
+                                "in replace '{}' is not a valid component: {}",
+                                parts[0], err
+                            )
+                        });
                         ReplaceRule::Component((
                             component,
                             Replacement {
@@ -230,5 +241,5 @@ fn read_replace(yaml_rules: &yaml_rust::Yaml) -> Vec<ReplaceRule> {
                 })
                 .collect()
         })
-        .unwrap_or_else(|| vec![])
+        .unwrap_or_default()
 }
