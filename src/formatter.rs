@@ -1,6 +1,5 @@
 use crate::{Component, Place};
-use failure::Fail;
-use failure::{format_err, Error};
+use anyhow::{anyhow, Context, Error};
 use itertools::Itertools;
 use regex::{Regex, RegexBuilder};
 use std::collections::HashMap;
@@ -39,7 +38,7 @@ impl FromStr for CountryCode {
                 Ok(CountryCode(s.to_uppercase()))
             }
         } else {
-            Err(format_err!(
+            Err(anyhow!(
                 "{} is not a valid ISO3166-1:alpha2 country code",
                 s,
             ))
@@ -254,7 +253,7 @@ impl Formatter {
         let text = template
             .handlebar_handler
             .render(MULTILINE_TEMPLATE_NAME, &addr)
-            .map_err(|e| e.context("impossible to render template"))?;
+            .context("impossible to render template")?;
 
         let text = cleanup_rendered(&text, rules);
 
@@ -309,7 +308,7 @@ impl Formatter {
         let text = template
             .handlebar_handler
             .render(SHORT_ADDR_TEMPLATE_NAME, &addr)
-            .map_err(|e| e.context("impossible to render short address template"))?;
+            .context("impossible to render short address template")?;
 
         let text = text.trim().to_owned();
         Ok(text)

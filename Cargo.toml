@@ -10,8 +10,7 @@ keywords = ["address", "i18n", "geocoder", "mimirsbrunn", "navitia"]
 readme = "README.md"
 
 [dependencies]
-failure = "0.1"
-include_dir = "0.7"
+anyhow = "1"
 serde =  { version = "1", features = ["derive"] }
 serde_yaml = "0.8"
 yaml-rust = "0.4"
@@ -24,7 +23,8 @@ linked-hash-map = "0.5"
 strum = "0.23"
 strum_macros = "0.23"
 enum-map = { version = "1", features = ["serde"] }
-env_logger = "0.9"
 
 [dev-dependencies]
+env_logger = "0.9"
+include_dir = "0.7"
 maplit = "1"

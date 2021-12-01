@@ -1,5 +1,5 @@
 use address_formatter::{Formatter, Place, PlaceBuilder};
-use failure::{format_err, Error};
+use anyhow::{anyhow, Context, Error};
 use include_dir::include_dir;
 use yaml_rust::{Yaml, YamlLoader};
 
@@ -56,19 +56,19 @@ fn run_test(
 
     let expected = yaml["expected"]
         .as_str()
-        .ok_or_else(|| format_err!("no expected value provided for file {}", file_name))?;
+        .context("no expected value provided for file")?;
 
     let addr = read_addr(
         yaml["components"]
             .as_hash()
-            .ok_or_else(|| format_err!("no component value provided {}", file_name))?,
+            .context("no component value provided")?,
         places_builder,
     )?;
 
     let formated_value = formatter.format(addr)?;
 
     if formated_value != expected {
-        Err(format_err!(
+        Err(anyhow!(
             r#"
 ====================================
 for file {}, test "{}"

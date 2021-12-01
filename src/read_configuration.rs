@@ -3,7 +3,7 @@ use crate::formatter::{
     Templates,
 };
 use crate::Component;
-use failure::{format_err, Error};
+use anyhow::{anyhow, Error};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -187,7 +187,7 @@ pub fn read_place_builder_configuration() -> PlaceBuilder {
 fn build_template(yaml_value: &yaml_rust::Yaml) -> Result<Template, Error> {
     let addr_template = yaml_value
         .as_str()
-        .ok_or_else(|| format_err!("no value to build template"))?;
+        .ok_or_else(|| anyhow!("no value to build template"))?;
 
     Ok(Template::new(addr_template))
 }
