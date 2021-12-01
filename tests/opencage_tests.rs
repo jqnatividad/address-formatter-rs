@@ -1,18 +1,16 @@
 use address_formatter::{Formatter, Place, PlaceBuilder};
 use failure::{format_err, Error};
-use include_dir::{include_dir, include_dir_impl};
+use include_dir::include_dir;
 use yaml_rust::{Yaml, YamlLoader};
 
 #[test]
 pub fn opencage_tests() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    let tests_dir = include_dir!("./address-formatting/testcases/countries");
 
     let formatter = Formatter::default();
     let places_builder = PlaceBuilder::default();
-    let errors: Vec<_> = tests_dir
+    let errors: Vec<_> = include_dir!("./address-formatting/testcases/countries")
         .files()
-        .iter()
         .filter_map(|f| {
             f.contents_utf8().map(|s| {
                 (
