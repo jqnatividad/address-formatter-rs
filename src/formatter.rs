@@ -70,7 +70,7 @@ pub(crate) struct NewComponent {
 #[derive(Debug, Default)]
 pub(crate) struct Template {
     /// Moustache template
-    pub handlebar_handler: handlebars::Handlebars,
+    pub handlebar_handler: handlebars::Handlebars<'static>,
     place_template: String, // used only to clone the template
 }
 
@@ -347,11 +347,7 @@ impl Formatter {
         country_code
     }
 
-    fn find_template<'a>(
-        &'a self,
-        addr: &Place,
-        country_code: &Option<CountryCode>,
-    ) -> &'a Template {
+    fn find_template(&self, addr: &Place, country_code: &Option<CountryCode>) -> &Template {
         country_code
             .as_ref()
             .and_then(|c| {

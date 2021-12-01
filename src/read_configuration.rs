@@ -4,19 +4,26 @@ use crate::formatter::{
 };
 use crate::Component;
 use failure::{format_err, Error};
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::str::FromStr;
+
+lazy_static! {
+    static ref RAW_TEMPLATES: Vec<yaml_rust::Yaml> = {
+        let raw_yaml = include_str!("../address-formatting/conf/countries/worldwide.yaml");
+
+        yaml_rust::YamlLoader::load_from_str(raw_yaml)
+            .expect("impossible to read worldwide.yaml file")
+    };
+}
 
 pub fn read_configuration() -> Formatter {
     // read all the opencage configuration
     // let opencage_dir = include_dir!("./address-formatting/conf");
-    let templates_file = include_str!("../address-formatting/conf/countries/worldwide.yaml");
-
-    let raw_templates = yaml_rust::YamlLoader::load_from_str(templates_file)
-        .expect("impossible to read worldwide.yaml file");
-    let default_template = build_template(&raw_templates[0]["default"]["address_template"])
+    let default_template = build_template(&RAW_TEMPLATES[0]["default"]["address_template"])
         .expect("no default address_template provided");
-    let fallback_template = build_template(&raw_templates[0]["default"]["fallback_template"])
+
+    let fallback_template = build_template(&RAW_TEMPLATES[0]["default"]["fallback_template"])
         .expect("no fallback address_template provided");
 
     // some countries uses the same rules as other countries (with some slight changes)
@@ -26,7 +33,7 @@ pub fn read_configuration() -> Formatter {
 
     let mut fallback_templates_by_country = HashMap::new();
     let mut rules_by_country = HashMap::new();
-    let mut templates_by_country: HashMap<CountryCode, Template> = raw_templates[0]
+    let mut templates_by_country: HashMap<CountryCode, Template> = RAW_TEMPLATES[0]
         .as_hash()
         .unwrap()
         .iter()
