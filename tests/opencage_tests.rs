@@ -16,16 +16,19 @@ pub fn opencage_tests() {
         .filter_map(|f| {
             f.contents_utf8().map(|s| {
                 (
-                    YamlLoader::load_from_str(s).expect(&format!(
-                        "impossible to read test file {}",
-                        f.path().display()
-                    )),
+                    YamlLoader::load_from_str(s).unwrap_or_else(|err| {
+                        panic!(
+                            "impossible to read test file {}: {}",
+                            f.path().display(),
+                            err
+                        )
+                    }),
                     f.path().to_str().unwrap(),
                 )
             })
         })
-        .flat_map(|(s, file_name)| s.into_iter().map(move |s| (s, file_name.clone())))
-        .map(|(t, file_name)| run_test(t, &file_name, &formatter, &places_builder))
+        .flat_map(|(s, file_name)| s.into_iter().map(move |s| (s, file_name)))
+        .map(|(t, file_name)| run_test(t, file_name, &formatter, &places_builder))
         .filter_map(|r| r.err())
         .map(|e| {
             log::error!("test on error: {}", e);
@@ -35,14 +38,10 @@ pub fn opencage_tests() {
 
     if errors.is_empty() {
         log::info!("All tests ok");
+    } else if errors.len() == 8 {
+        log::warn!("Some tests are failing but we consider it's ok, it's still a work in progress");
     } else {
-        if errors.len() == 8 {
-            log::warn!(
-                "Some tests are failing but we consider it's ok, it's still a work in progress"
-            );
-        } else {
-            panic!("{} tests were on error", errors.len());
-        }
+        panic!("{} tests were on error", errors.len());
     }
 }
 
@@ -57,15 +56,14 @@ fn run_test(
         .unwrap_or("no description provided");
     log::debug!("running {}", &description);
 
-    let expected = yaml["expected"].as_str().ok_or(format_err!(
-        "no expected value provided for file {}",
-        file_name
-    ))?;
+    let expected = yaml["expected"]
+        .as_str()
+        .ok_or_else(|| format_err!("no expected value provided for file {}", file_name))?;
 
     let addr = read_addr(
         yaml["components"]
             .as_hash()
-            .ok_or(format_err!("no component value provided {}", file_name))?,
+            .ok_or_else(|| format_err!("no component value provided {}", file_name))?,
         places_builder,
     )?;
 
