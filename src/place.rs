@@ -84,7 +84,7 @@ where
 {
     fn from(data: T) -> Self {
         let mut a = Self::default();
-        for (k, v) in data.into_iter() {
+        for (k, v) in data {
             a[k] = Some(v.to_owned());
         }
         a

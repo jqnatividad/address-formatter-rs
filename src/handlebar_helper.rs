@@ -24,7 +24,7 @@ impl HelperDef for FirstNonNullHelper {
 
         let value = rendered_text
             .split("||")
-            .map(|s| s.trim())
+            .map(str::trim)
             .find(|v| !v.is_empty())
             .unwrap_or("");
 

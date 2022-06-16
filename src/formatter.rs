@@ -350,15 +350,15 @@ impl Formatter {
         country_code
             .as_ref()
             .and_then(|c| {
-                if !has_minimum_place_components(addr) {
+                if has_minimum_place_components(addr) {
+                    self.templates.templates_by_country.get(c)
+                } else {
                     // if the place does not have the minimum fields, we get its country fallback template
                     // if there is a specific one, else we get the default fallback template
                     self.templates
                         .fallback_templates_by_country
                         .get(c)
                         .or(Some(&self.templates.fallback_template))
-                } else {
-                    self.templates.templates_by_country.get(c)
                 }
             })
             .unwrap_or(&self.templates.default_template)
@@ -432,7 +432,7 @@ impl PlaceBuilder {
     pub fn build_place<'a>(&self, values: impl IntoIterator<Item = (&'a str, String)>) -> Place {
         let mut place = Place::default();
         let mut unknown = HashMap::<String, String>::new();
-        for (k, v) in values.into_iter() {
+        for (k, v) in values {
             let component = Component::from_str(k).ok();
             if let Some(component) = component {
                 place[component] = Some(v);
@@ -549,7 +549,7 @@ fn cleanup_rendered(text: &str, rules: &Rules) -> String {
     // and all the same lines too
     let mut res = res
         .split('\n')
-        .map(|s| s.split(", ").map(|e| e.trim()).dedup().join(", "))
+        .map(|s| s.split(", ").map(str::trim).dedup().join(", "))
         .dedup()
         .join("\n");
 
