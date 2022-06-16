@@ -20,9 +20,9 @@ regex = "1"
 lazy_static = "1"
 itertools = "0.10"
 linked-hash-map = "0.5"
-strum = "0.23"
-strum_macros = "0.23"
-enum-map = { version = "1", features = ["serde"] }
+strum = "0.24"
+strum_macros = "0.24"
+enum-map = { version = "2.4", features = ["serde"] }
 
 [dev-dependencies]
 env_logger = "0.9"
