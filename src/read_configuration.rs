@@ -59,7 +59,9 @@ pub fn read_configuration() -> Formatter {
                     .into_iter()
                     .map(|r| match r {
                         ReplaceRule::All(r) => r,
-                        ReplaceRule::Component(_) => panic!("postformat rules cannot be applied on only one element"),
+                        ReplaceRule::Component(_) => {
+                            panic!("postformat rules cannot be applied on only one element")
+                        }
                     })
                     .collect();
 
@@ -106,7 +108,9 @@ pub fn read_configuration() -> Formatter {
             .cloned()
             .unwrap_or_default();
         new_rules.change_country_code = Some(parent_country_code.as_str().to_owned());
-        new_rules.change_country = template["change_country"].as_str().map(std::string::ToString::to_string);
+        new_rules.change_country = template["change_country"]
+            .as_str()
+            .map(std::string::ToString::to_string);
         new_rules.add_component = add_component;
         rules_by_country.insert(country_code.clone(), new_rules);
     }
